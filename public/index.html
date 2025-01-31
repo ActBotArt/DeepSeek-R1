@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LINC-BOT</title>
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --secondary: #6366f1;
+            --background: #f8fafc;
+            --code-bg: #f3f4f6;
+            --code-border: #e5e7eb;
+            --dark-text: #1f2937;
+            --dark-bg: #e5e7eb;
+            --discussion-line: #4f46e5;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+        }
+
+        body {
+            background: var(--background);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            padding: 1rem;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 800px;
+            background: white;
+            border-radius: 1rem;
+            box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.05);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .chat-box {
+            flex: 1;
+            padding: 1.5rem;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            background: var(--background);
+        }
+
+        .message-container {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 0.5rem;
+        }
+
+        .user-message {
+            background: white;
+            border: 1px solid #e2e8f0;
+            padding: 1rem;
+            border-radius: 1rem;
+            max-width: 45%;
+            align-self: flex-end;
+        }
+
+        .assistant-message-container {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            max-width: 45%;
+            gap: 0.5rem;
+        }
+
+        .discussion-section {
+            background: var(--dark-bg);
+            border-left: 4px solid var(--discussion-line);
+            border-radius: 0.5rem;
+            padding: 1rem;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .discussion-header {
+            font-weight: bold;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .toggle-arrow {
+            margin-left: 10px;
+            transition: transform 0.3s ease;
+        }
+
+        .discussion-content {
+            display: block;
+            margin-top: 0.5rem;
+        }
+
+        .discussion-section.collapsed .discussion-content {
+            display: none;
+        }
+
+        .discussion-section.collapsed .toggle-arrow {
+            transform: rotate(0deg);
+        }
+
+        .discussion-section .toggle-arrow {
+            transform: rotate(180deg);
+        }
+
+        .assistant-message {
+            background: white;
+            border: 1px solid #e2e8f0;
+            padding: 1rem;
+            border-radius: 1rem;
+            white-space: pre-line; 
+        }
+
+        .input-area {
+            padding: 1rem;
+            border-top: 1px solid #e2e8f0;
+            background: white;
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
+        .input-group {
+            flex: 1;
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        #prompt {
+            flex: 1;
+            padding: 0.75rem 1.25rem;
+            border: 1px solid #e2e8f0;
+            border-radius: 0.75rem;
+            font-size: 1rem;
+            transition: all 0.2s;
+            resize: none;
+            height: 50px;
+        }
+
+        button {
+            padding: 0.75rem 1.5rem;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        button:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+        }
+
+        .loading-spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .retry-button {
+            padding: 0.5rem 1rem;
+            background: #e74c3c;
+            color: white;
+            border: none;
+            border-radius: 0.75rem;
+            cursor: pointer;
+            margin-top: 1rem;
+        }
+
+        .retry-button:hover {
+            opacity: 0.8;
+            transform: translateY(-1px);
+        }
+
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="chat-box" id="chat-box"></div>
+        <div class="input-area">
+            <div class="input-group">
+                <textarea id="prompt" placeholder="Введите сообщение..." rows="1"></textarea>
+                <button id="sendButton" onclick="sendMessage()">Отправить</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('prompt').addEventListener('keypress', function(event) {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                sendMessage();
+            }
+        });
+
+        let isSending = false;
+
+        async function sendMessage() {
+            if (isSending) return;  // Не отправлять, если уже идет обработка
+
+            const prompt = document.getElementById('prompt').value.trim();
+            if (!prompt) return;
+
+            isSending = true;  // Блокируем возможность отправить новый запрос
+
+            const sendButton = document.getElementById('sendButton');
+            sendButton.classList.add('disabled');
+            document.getElementById('prompt').disabled = true;  // Блокируем textarea (только кнопка отправки)
+
+            const chatBox = document.getElementById('chat-box');
+
+            // Добавляем сообщение пользователя
+            const messageContainer = document.createElement('div');
+            messageContainer.className = 'message-container';
+            chatBox.appendChild(messageContainer);
+
+            const userDiv = document.createElement('div');
+            userDiv.className = 'user-message';
+            userDiv.innerHTML = prompt;
+            messageContainer.appendChild(userDiv);
+            document.getElementById('prompt').value = '';
+
+            // Добавляем контейнер для ответа
+            const assistantContainer = document.createElement('div');
+            assistantContainer.className = 'assistant-message-container';
+            chatBox.appendChild(assistantContainer);
+
+            const discussionDiv = document.createElement('div');
+            discussionDiv.className = 'discussion-section';
+            discussionDiv.innerHTML = `<div class="discussion-header" onclick="toggleDiscussion(this)">Рассуждение:<span class="toggle-arrow">▼</span></div>
+                                       <div class="discussion-content">Генерация ответа...</div>`;
+            assistantContainer.appendChild(discussionDiv);
+
+            const assistantDiv = document.createElement('div');
+            assistantDiv.className = 'assistant-message';
+            assistantDiv.innerHTML = '<div class="loading-spinner"></div>';
+            assistantContainer.appendChild(assistantDiv);
+
+            // Прокручиваем чат вниз
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+            // Отправка запроса на сервер
+            try {
+                const response = await fetch('/api/generate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ prompt, sessionId: 'default' })
+                });
+
+                if (!response.ok) throw new Error('Ошибка сервера');
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let answer = '';
+                let thinkText = '';
+                let isThinking = false;
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    const text = decoder.decode(value, { stream: true });
+                    const lines = text.split('\n').filter(Boolean);
+
+                    for (const line of lines) {
+                        if (line.startsWith('data:')) {
+                            const parsed = JSON.parse(line.slice(5));
+                            if (parsed.content) {
+                                if (parsed.content.includes('<think>')) {
+                                    isThinking = true;
+                                    parsed.content = parsed.content.replace('<think>', '');
+                                }
+                                if (parsed.content.includes('</think>')) {
+                                    isThinking = false;
+                                    parsed.content = parsed.content.replace('</think>', '');
+                                }
+
+                                if (isThinking) {
+                                    thinkText += parsed.content;
+                                    discussionDiv.querySelector('.discussion-content').innerHTML = thinkText;
+                                } else {
+                                    answer += parsed.content;
+                                    assistantDiv.innerHTML = answer;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Если рассуждение пустое, скрываем его
+                if (!thinkText.trim()) {
+                    discussionDiv.classList.add('collapsed');
+                }
+
+            } catch (error) {
+                assistantDiv.innerHTML = 'Ошибка получения ответа';
+                const retryButton = document.createElement('button');
+                retryButton.className = 'retry-button';
+                retryButton.textContent = 'Повторить запрос';
+                retryButton.onclick = sendMessage;
+                assistantDiv.appendChild(retryButton);
+                console.error('Ошибка:', error);
+            }
+
+            isSending = false;  // Разблокируем возможность отправить новый запрос
+            sendButton.classList.remove('disabled');
+            document.getElementById('prompt').disabled = false;  // Разблокируем textarea
+        }
+
+        function toggleDiscussion(header) {
+            header.parentElement.classList.toggle('collapsed');
+        }
+    </script>
+</body>
+</html>
