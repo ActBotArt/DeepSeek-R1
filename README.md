@@ -41,7 +41,7 @@ Open the terminal: Ctrl + Alt + T or search for "Terminal" in the applications.
 Open the terminal: Cmd + Space and type "Terminal" or find it in the "Utilities" folder.  
 
 #### Windows:  
-Open the command prompt: Win + R, type `cmd`, and press Enter.  
+Open the command prompt: Win + R, type cmd, and press Enter.  
 
 ---
 
