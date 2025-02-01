@@ -58,10 +58,10 @@ app.post('/api/generate', async (req, res) => {
         ];
 
         const ollamaResponse = await axios.post('http://localhost:11434/api/chat', {
-            model: 'deepseek-r1:7b',
+            // Можете использовать любую модель!
+			model: 'deepseek-r1:7b',
             messages,
             stream: true,
-            options: { temperature: 0.7, max_tokens: 500 }
         }, { responseType: 'stream' });
 
         res.setHeader('Content-Type', 'text/event-stream');
