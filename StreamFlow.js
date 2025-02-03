@@ -9,6 +9,7 @@ const axios = require('axios');
 const app = express();
 const port = 3000;
 
+
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
         const uploadDir = path.join(__dirname, 'public', 'uploads');
@@ -32,7 +33,8 @@ const upload = multer({
 });
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '100mb' }));
+app.use(express.urlencoded({ limit: '100mb', extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 let sessions = {};
@@ -59,7 +61,7 @@ app.post('/api/generate', async (req, res) => {
 
         const ollamaResponse = await axios.post('http://localhost:11434/api/chat', {
             // Можете использовать любую модель!
-			model: 'deepseek-r1:7b',
+            model: 'deepseek-r1:7b',
             messages,
             stream: true,
         }, { responseType: 'stream' });
