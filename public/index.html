@@ -10,12 +10,12 @@
     <div class="container">
         <div class="chat-box" id="chat-box"></div>
         <div class="input-area">
-            <div id="attachmentsPreview" class="attachments-preview" style="display: none;"></div>
+            <div id="attachmentsPreview" class="attachments-preview"></div>
             <div class="input-group">
                 <button id="uploadButton" title="Загрузить файл">📎</button>
                 <textarea id="prompt" placeholder="Введите сообщение..." rows="1"></textarea>
                 <button id="sendButton">Отправить</button>
-                <input type="file" id="fileInput" style="display: none" />
+                <input type="file" id="fileInput" hidden accept="image/*, .txt, .pdf">
             </div>
         </div>
     </div>

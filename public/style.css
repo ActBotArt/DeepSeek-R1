@@ -208,45 +208,54 @@ button:hover {
   align-items: center;
 }
 
-/* Стили для предварительного просмотра вложений */
+/* Стили для контейнера превью */
 .attachments-preview {
-  display: flex;
+  display: none;
+  flex-direction: row;
+  gap: 10px;
+  padding: 10px;
+  background: #f5f5f5;
+  border-radius: 10px;
+  margin-bottom: 10px;
   flex-wrap: wrap;
-  gap: 0.5rem;
-  padding: 0.5rem;
-  background: #f0f0f0;
-  border: 1px solid #e2e8f0;
-  border-radius: 0.75rem;
-  margin-bottom: 0.5rem;
+  transition: all 0.3s ease;
+  animation: fadeIn 0.3s ease;
 }
 
-/* Стили для отдельного элемента предварительного просмотра вложения */
-.attachment-preview-item {
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.attachment-preview {
   position: relative;
-  display: inline-block;
+  width: 80px;
+  height: 80px;
+  border-radius: 8px;
+  overflow: hidden;
 }
 
-.attachment-preview-item img {
-  max-width: 100px;
-  max-height: 100px;
-  border-radius: 0.5rem;
+.attachment-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
-/* Кнопка удаления вложения – более аккуратный вид */
-.attachment-preview-item .remove-btn {
+.remove-btn {
   position: absolute;
-  top: -5px;
-  right: -5px;
-  background: #fff;
-  color: red;
-  border: 1px solid red;
+  top: 2px;
+  right: 2px;
+  background: rgba(255,255,255,0.9);
+  border: none;
   border-radius: 50%;
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
-  font-size: 12px;
-  line-height: 18px;
-  text-align: center;
+  font-size: 16px;
+  color: #ff4444;
   padding: 0;
 }
 
@@ -259,8 +268,10 @@ button:hover {
 }
 
 .attachment-message img {
-  max-width: 200px;
-  border-radius: 0.5rem;
+  max-width: 150px;
+  border-radius: 4px;
+  margin: 5px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
 }
 
 /* Оверлей для предупреждения, если фото превышает лимит */
@@ -278,4 +289,10 @@ button:hover {
   font-size: 14px;
   font-weight: bold;
   border-radius: 0.5rem;
+}
+
+.file-warning {
+  color: red;
+  font-size: 12px;
+  margin-top: 5px;
 } 
