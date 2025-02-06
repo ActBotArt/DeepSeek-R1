@@ -5,6 +5,8 @@ const path = require('path');
 const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
 const axios = require('axios');
+const xlsx = require('xlsx');
+const mammoth = require('mammoth');
 
 const app = express();
 const port = 3001;
@@ -24,11 +26,19 @@ const storage = multer.diskStorage({
 
 const upload = multer({
     storage,
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
     fileFilter: (req, file, cb) => {
-        const allowedTypes = ['image/jpeg', 'image/png', 'image/gif'];
-        allowedTypes.includes(file.mimetype)
-            ? cb(null, true)
-            : cb(new Error('Invalid file type'));
+        const allowedTypes = [
+            'text/plain',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'application/json'
+        ];
+        
+        if (!allowedTypes.includes(file.mimetype)) {
+            return cb(new Error('Разрешены только текстовые файлы (TXT, XLSX, DOCX, JSON)'));
+        }
+        cb(null, true);
     }
 });
 
@@ -43,84 +53,113 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-app.post('/api/upload', upload.single('image'), (req, res) => {
+app.post('/api/upload', upload.single('file'), async (req, res) => {
     if (!req.file) return res.status(400).send('No file uploaded');
-    res.json({ url: `/uploads/${req.file.filename}` });
+    
+    try {
+        const content = await parseFileContent(req.file);
+        const txtPath = path.join(path.dirname(req.file.path), `${path.parse(req.file.filename).name}.txt`);
+        fs.writeFileSync(txtPath, content);
+        
+        res.json({ 
+            url: `/uploads/${path.basename(txtPath)}`,
+            original: `/uploads/${req.file.filename}`
+        });
+    } catch (e) {
+        res.status(500).send(`Ошибка обработки файла: ${e.message}`);
+    }
+});
+
+app.get('/uploads/:filename', (req, res) => {
+    const filePath = path.join(__dirname, 'public', 'uploads', req.params.filename);
+    if (fs.existsSync(filePath)) {
+        res.sendFile(filePath);
+    } else {
+        res.status(404).send('File not found');
+    }
+});
+
+app.get('/api/models', async (req, res) => {
+    try {
+        const response = await axios.get('http://localhost:11434/api/tags');
+        const models = response.data.models
+            .filter(m => !m.name.includes('vision')) // Убираем модели с поддержкой зрения
+            .map(model => ({
+                name: model.name,
+                supports_files: true
+            }));
+        
+        res.json(models);
+    } catch (error) {
+        console.error('Error fetching models:', error);
+        res.status(500).json({ error: 'Не удалось получить список моделей' });
+    }
 });
 
 app.post('/api/generate', async (req, res) => {
     try {
-        const { sessionId, content } = req.body;
+        const { sessionId, content, model } = req.body;
 
-        if (!sessions[sessionId]) sessions[sessionId] = [];
+        // Проверка наличия модели
+        if (!model) {
+            return res.status(400).json({ error: 'Модель не выбрана' });
+        }
 
-        // Формируем массив контента
-        const messageContent = [];
+        // Проверяем наличие контента. Если текст пустой, проверяем, что есть хотя бы один файл с непустым содержимым.
+        if (
+            !content ||
+            (content.question.trim() === "" &&
+             (!content.files ||
+              content.files.filter(f => f.content && f.content.trim() !== "").length === 0))
+        ) {
+            return res.status(400).json({ error: 'Пустой запрос' });
+        }
+
+        // Инициализируем сессию
+        if (!sessions[sessionId]) {
+            sessions[sessionId] = [{
+                role: "system",
+                content: "Отвечай только на русском языке"
+            }];
+        }
+
+        const currentSession = sessions[sessionId];
         
-        // Добавляем изображение если есть
-        if (content.photo) {
-            messageContent.push({
-                type: "image_url",
-                image_url: {
-                    url: `data:image/png;base64,${content.photo}`
-                }
+        // Добавляем файлы как отдельные сообщения, если есть
+        if (content.files && content.files.length > 0) {
+            content.files.forEach(file => {
+                currentSession.push({
+                    role: "user",
+                    content: `Документ: ${file.fileName}\nСодержимое:\n${file.content}`
+                });
             });
         }
 
-        // Добавляем текст только если он не пустой
-        if (content.question && content.question.trim().length > 0) {
-            messageContent.push({
-                type: "text",
-                text: content.question.trim()
+        // Добавляем текстовый вопрос
+        if (content.question?.trim()) {
+            currentSession.push({
+                role: "user",
+                content: content.question.trim()
             });
         }
 
-        // Проверяем наличие контента
-        if (messageContent.length === 0) {
-            return res.status(400).json({ error: "Пустой запрос" });
-        }
+        console.log("Контекст:", JSON.stringify(currentSession, null, 2));
 
-        // Если в вопросе есть русские символы, добавляем системное сообщение
-        if (/[а-яё]/i.test(content.question || '')) {
-            sessions[sessionId].push({
-                role: 'system',
-                content: 'Отвечай только на русском языке'
-            });
-        }
+        // Формируем тело запроса для Ollama
+        const requestBody = {
+            model: model,
+            messages: currentSession,
+            stream: true
+        };
 
-        // Добавляем сообщение пользователя
-        sessions[sessionId].push({
-            role: 'user',
-            content: messageContent
-        });
-
-        const currentMessages = sessions[sessionId];
-        console.log("Контекст:", JSON.stringify(currentMessages, null, 2));
-
-        // Формируем сообщения для Ollama
-        const ollamaMessages = currentMessages.map(msg => {
-            if (msg.role === 'user') {
-                // Для пользовательских сообщений объединяем контент
-                return {
-                    role: msg.role,
-                    content: msg.content.map(item => {
-                        if (item.type === 'text') return item.text;
-                        if (item.type === 'image_url') return `[Image: ${item.image_url.url}]`;
-                        return '';
-                    }).join('\n')
-                };
+        // Отправляем запрос в Ollama
+        const ollamaResponse = await axios.post('http://localhost:11434/api/chat', 
+            requestBody,
+            { 
+                responseType: 'stream',
+                validateStatus: (status) => status < 500 
             }
-            return msg; // Системные и ассистентские сообщения остаются без изменений
-        });
-
-        const ollamaResponse = await axios.post('http://localhost:11434/api/chat', {
-            model: 'deepseek-r1:7b',
-            messages: ollamaMessages, // Используем преобразованные сообщения
-            stream: true,
-        }, { 
-            responseType: 'stream',
-            validateStatus: (status) => status < 500 
-        });
+        );
 
         // Обработка ошибок Ollama
         if (ollamaResponse.status >= 400) {
@@ -198,6 +237,36 @@ app.post('/api/generate', async (req, res) => {
         });
     }
 });
+
+// Новая функция для парсинга файлов
+async function parseFileContent(file) {
+    const ext = path.extname(file.originalname).toLowerCase();
+    
+    try {
+        const buffer = fs.readFileSync(file.path);
+        
+        switch(ext) {
+            case '.xlsx':
+                const workbook = xlsx.read(buffer, {type: 'buffer'});
+                return xlsx.utils.sheet_to_csv(workbook.Sheets[workbook.SheetNames[0]]);
+            
+            case '.docx':
+                const {value} = await mammoth.extractRawText({buffer});
+                return value;
+            
+            case '.json':
+                const jsonData = JSON.parse(buffer.toString());
+                return Object.entries(jsonData)
+                    .map(([key, value]) => `${key}: ${JSON.stringify(value)}`)
+                    .join('\n');
+            
+            default: // .txt
+                return buffer.toString();
+        }
+    } catch (e) {
+        throw new Error(`Ошибка чтения файла: ${e.message}`);
+    }
+}
 
 app.listen(port, () => {
     console.log(`Server: http://localhost:${port}`);

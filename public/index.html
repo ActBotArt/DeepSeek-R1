@@ -10,12 +10,27 @@
     <div class="container">
         <div class="chat-box" id="chat-box"></div>
         <div class="input-area">
+            <div class="model-selector">
+                <select id="modelSelect" required>
+                    <option value="" disabled selected>Выберите модель...</option>
+                </select>
+            </div>
             <div id="attachmentsPreview" class="attachments-preview"></div>
             <div class="input-group">
                 <button id="uploadButton" title="Загрузить файл">📎</button>
-                <textarea id="prompt" placeholder="Введите сообщение..." rows="1"></textarea>
-                <button id="sendButton">Отправить</button>
-                <input type="file" id="fileInput" hidden accept="image/*, .txt, .pdf">
+                <textarea id="prompt" placeholder="Введите сообщение или перетащите файл..." rows="1"></textarea>
+                <div class="button-group">
+                    <button id="sendButton">➤</button>
+                    <button id="randomModel" title="Случайная модель">🎲</button>
+                </div>
+                <input 
+                    type="file" 
+                    id="fileInput" 
+                    hidden 
+                    accept=".txt,.docx,.xlsx,.json"
+                    multiple
+                    title="Поддерживаемые форматы: TXT, DOCX, XLSX, JSON"
+                >
             </div>
         </div>
     </div>
