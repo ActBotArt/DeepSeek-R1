@@ -164,7 +164,7 @@ if (typeof document !== 'undefined') {
       }
     }
 
-    // Обновлённая функция отображения вложений
+    // Обновляем функцию отображения вложений
     function renderAttachmentsPreview() {
         attachmentsPreview.innerHTML = '';
         
@@ -182,8 +182,20 @@ if (typeof document !== 'undefined') {
                             <div class="file-size">${formatFileSize(att.size)}</div>
                         </div>
                     </div>
-                    <button class="delete-btn" data-index="${index}">&times;</button>
+                    <button class="delete-file-btn" data-index="${index}">×</button>
                 `;
+
+                // Добавляем прямой обработчик на кнопку удаления
+                const deleteBtn = fileCard.querySelector('.delete-file-btn');
+                deleteBtn.addEventListener('click', function() {
+                    fileCard.classList.add('removing');
+                    setTimeout(() => {
+                        pendingAttachments.splice(index, 1);
+                        renderAttachmentsPreview();
+                        updateSendButtonState();
+                    }, 300);
+                });
+
                 attachmentsPreview.appendChild(fileCard);
             });
         } else {
@@ -324,7 +336,7 @@ if (typeof document !== 'undefined') {
           const filesContainer = document.createElement('div');
           filesContainer.className = 'files-container';
           
-          attachments.forEach(file => {
+          attachments.forEach((file, index) => {
               const fileElement = document.createElement('div');
               fileElement.className = 'file-preview';
               fileElement.innerHTML = `
@@ -584,18 +596,6 @@ if (typeof document !== 'undefined') {
             autoScrollButton.classList.remove('show');
         }
     }
-
-    // Обработчик удаления файлов
-    document.addEventListener('click', function(e) {
-        if (e.target.classList.contains('delete-btn')) {
-            const index = parseInt(e.target.getAttribute('data-index'));
-            if (!isNaN(index) && index >= 0 && index < pendingAttachments.length) {
-                pendingAttachments.splice(index, 1);
-                renderAttachmentsPreview();
-                updateSendButtonState();
-            }
-        }
-    });
 
     // Новая функция для случайного выбора модели
     function selectRandomModel() {
