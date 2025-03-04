@@ -97,7 +97,6 @@ On Linux/macOS
      ```
    - Добавьте в него:
      ```bash
-     #!/bin/bash
      node StreamFlow.js
      ```
    - Сделайте его исполняемым:
